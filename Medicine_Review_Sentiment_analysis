@@ -1,1 +1,24 @@
+# Importing All Necessary Libraries ##
+import numpy as np   
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from imblearn.over_sampling import SMOTE  
+##.................Importing train & tst data................############
+dataset= pd.read_csv("C:/Users/Dipu/Desktop/Data Science/assignments/Project/train.csv")
+data= pd.read_csv("C:/Users/Dipu/Desktop/Data Science/assignments/Project/test.csv")
+## FINDING NULL VALUES...##
+dataset.isnull().sum() ## there is 219 null values in condition column which is 0.005% of entire value#
+data.isnull().sum()
+print("Missing value (%):", 1200/drugs.shape[0] *100)
+#Missing value (%): 2.9758952484872534
+## droping all NA values from Train  data..##
+dataset.dropna(inplace=True)
 
+#lets find Uniqueness of Id, drug name & condition
+#though the drug name & Condition are related with each other 
+#lets chek them together
+len(set(drugs['Id'].values))
+#Id is huge number so we will not choose it 
+drugs['Id'].unique()
+sns.countplot(total_drugs)
