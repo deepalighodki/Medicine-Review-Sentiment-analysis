@@ -1,26 +1,277 @@
-# Importing All Necessary Libraries ##
-import numpy as np   
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from imblearn.over_sampling import SMOTE  
-##.................Importing train & tst data................############
-drugs= pd.read_csv("C:/Users/Dipu/Desktop/Data Science/assignments/Project/train.csv")
-data= pd.read_csv("C:/Users/Dipu/Desktop/Data Science/assignments/Project/test.csv")
-## FINDING NULL VALUES...##
-drugs.isnull().sum() ## there is 219 null values in condition column which is 0.005% of entire value#
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+import matplotlib.pyplot as plt # Data visualizations
+import seaborn as sns #high-level interface for drawing attractive and informative statistical graphics
+import pickle
+drugs = pd.read_csv("/kaggle/input/medicine-review/train.csv")
+drugs
+drugs.isnull().sum() ## there is 899 null values in condition column which is 0.005% of entire value#
+print("Missing value (%):", 1200/drugs.shape[0] *100)
+#Missing value (%): 7%
+## droping all NA values from Train  data..##
+drugs.dropna(inplace=True)
 drugs.isnull().sum()
+len(set(drugs['uniqueID'].values))
+drugs['uniqueID'].unique()
+total_drugs = drugs['drugName'].value_counts()
+sns.countplot(total_drugs)
+plt.hist(drugs.drugName)
+plt.hist(drugs.condition)
+plt.plot(drugs.rating,drugs.drugName,"bo");plt.xlabel("Rating");plt.ylabel("Drug name")
+plt.plot(drugs.rating,drugs.condition,"bo");plt.xlabel("Rating");plt.ylabel("Drug_Condition")
+plt.plot(drugs.rating,drugs.usefulCount,"bo");plt.xlabel("Rating");plt.ylabel("UsefulCount")
+plt.hist(drugs.rating)
+plt.boxplot(drugs.rating,0,"rs",0)
+import re
+def cleaning_text(i):
+    i = re.sub("[^A-Za-z" "]+"," ",i).lower()
+    i = re.sub("[0-9" "]+"," ",i)
+    i= re.sub("[\W+""]", " ",i)        
+    w = []
+    for word in i.split(" "):
+        if len(word)>3:
+            w.append(word)
+    return (" ".join(w))
+
+drugs.review= drugs.review.apply(cleaning_text)
+drugs.review
+drugs.condition=drugs.condition.apply(cleaning_text)
+drugs.condition
+# removing the date column as date has not that significance in output##
+drugs.drop(["date"],axis=1,inplace=True)
+drugs
+## subjectvity & polarity of each review rows...##
+from textblob import TextBlob
+
+drugs['polarity'] = drugs['review'].apply(lambda x: TextBlob(x).sentiment.polarity)
+#%%time
+drugs['subjectivity'] = drugs['review'].apply(lambda x: TextBlob(x).sentiment.subjectivity)
+drugs['polarity'],drugs['subjectivity']
+## Finding sentiment through VADER sentiment Analyzer..##
+import nltk
+nltk.download('vader_lexicon')
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+sid = SentimentIntensityAnalyzer()
+sid.polarity_scores(drugs.iloc[4]['review'])
+drugs['vad_scores'] = drugs['review'].apply(lambda review:sid.polarity_scores(review))
+drugs['vad_compound'] = drugs['vad_scores'].apply(lambda d:d['compound'])
+drugs['vad_scores']
+drugs['vad_scores']
+drugs['vad_compound']
+
+
+test_data = pd.read_csv("/kaggle/input/medicine/test.csv")
+test_data
+test_data.drop(["date"],axis=1,inplace=True)
+test_data
+test_data.isnull().sum()
 print("Missing value (%):", 1200/drugs.shape[0] *100)
 #Missing value (%): 2.9758952484872534
 ## droping all NA values from Train  data..##
-drugs.dropna(inplace=True)
+test_data.dropna(inplace=True)
+test_data.review=test_data.review.apply(cleaning_text)
+test_data.review
+test_data.drugName=test_data.drugName.apply(cleaning_text)
+test_data.drugName
+test_data.condition=test_data.condition.apply(cleaning_text)
+test_data.condition
+test_data['polarity'] = test_data['review'].apply(lambda x: TextBlob(x).sentiment.polarity)
+#%%time
+test_data['subjectivity'] = test_data['review'].apply(lambda x: TextBlob(x).sentiment.subjectivity)
+sid = SentimentIntensityAnalyzer()
+sid.polarity_scores(test_data.iloc[4]['review'])
+test_data['vad_scores'] =test_data['review'].apply(lambda review:sid.polarity_scores(review))
+test_data['vad_compound'] = test_data['vad_scores'].apply(lambda d:d['compound'])
+test_data['vad_scores']
+drugs['rating']= drugs['rating'].apply(lambda x: 1 if x>5 else 0)
+drugs['rating']
+sns.countplot(drugs['rating'])
+drugs['rating'].value_counts(normalize=True)*100
 
-#lets find Uniqueness of Id, drug name & condition
-#though the drug name & Condition are related with each other 
-#lets chek them together
-len(set(drugs['Id'].values))
-#Id is huge number so we will not choose it 
-drugs['Id'].unique()
-total_drugs = drugs['drugName'].value_counts()
-sns.countplot(total_drugs)
-https://www.kaggle.com/deepalighodki/medicine-review-sentiment-analysis
+from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder 
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import StandardScaler
+from sklearn import metrics
+from sklearn.metrics import accuracy_score
+
+cv = TfidfVectorizer()
+le = LabelEncoder() 
+drugs['drugName']= le.fit_transform(drugs['drugName']) 
+drugs['condition']= le.fit_transform(drugs['condition']) 
+
+X= drugs[['vad_compound','polarity','subjectivity','condition','drugName']]
+y=drugs.rating
+X,y
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2)
+
+X_train.shape,X_test.shape,y_train.shape,y_test.shape
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+scaler.fit(X_train)
+# Now apply the transformations to the data:
+X_train =scaler.transform(X_train)
+X_test = scaler.transform(X_test)
+X_train,X_test
+
+from sklearn.neural_network import MLPClassifier
+
+mlp = MLPClassifier(hidden_layer_sizes=(10,10))
+
+mlp.fit(X_train,y_train)
+prediction_train=mlp.predict(X_train)
+prediction_test = mlp.predict(X_test)
+
+from sklearn.metrics import classification_report,confusion_matrix
+print(confusion_matrix(y_test,prediction_test))
+np.mean(y_train==prediction_train)*100
+np.mean(y_test==prediction_test)*100
+
+print("Accuracy:",metrics.accuracy_score(y_test, prediction_test ))
+
+## ACCURACY=73.53%....##
+from sklearn.metrics import cohen_kappa_score
+cohen_kappa_score(y_test,prediction_test)
+
+from imblearn.over_sampling import SMOTE
+sm = SMOTE(random_state = 2) 
+X_train_oversampled,y_train_oversampled = sm.fit_sample(X_train, y_train)
+X_train_oversampled.shape
+y_train_oversampled.shape
+sns.countplot(y_train_oversampled)
+y_train_oversampled.value_counts(normalize=True)*100
+mlp = MLPClassifier(hidden_layer_sizes=(10,10))
+
+mlp.fit(X_train_oversampled,y_train_oversampled)
+prediction_train=mlp.predict(X_train_oversampled)
+prediction_test = mlp.predict(X_test)
+
+from sklearn.metrics import classification_report,confusion_matrix
+print(confusion_matrix(y_test,prediction_test))
+np.mean(y_train_oversampled==prediction_train)*100
+np.mean(y_test==prediction_test)*100
+
+print("Accuracy:",metrics.accuracy_score(y_test, prediction_test ))
+
+from sklearn import svm
+from sklearn.exceptions import NotFittedError
+from sklearn.metrics import classification_report
+
+## Using Naive Bays Classifier...##
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+
+
+X= drugs.review
+y=drugs.rating
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20)
+
+nb = Pipeline([('tfidf', TfidfVectorizer()),
+               ('clf', MultinomialNB())])
+              
+
+model=nb.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+print(classification_report(y_test,y_pred))
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+
+## accuracy =75.75%.... precision 0 ..91   1----73
+
+from sklearn.metrics import cohen_kappa_score
+
+cohen_kappa_score(y_test, y_pred)
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+log_re=Pipeline([('tfidf', TfidfVectorizer()),
+                ('clf', LogisticRegression()),
+               ])
+
+LR_Model=log_re.fit(X_train,y_train)
+y_pred = LR_Model.predict(X_test)
+print(classification_report(y_test,y_pred))
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+## accuracy =75.75%.... precision 0 ..91   1----73
+### kappa score...##
+cohen_kappa_score(y_test,y_pred)
+
+print(classification_report(y_test,y_pred)) ## precision 0-> 78, 1-> 86... recall 0--> 63, 1-->> .92
+# confusion Matrix...##
+from sklearn.metrics import confusion_matrix
+confusion_matrix = confusion_matrix(y_test, y_pred)
+print(confusion_matrix)
+## ROC Curve...
+from sklearn.metrics import roc_curve, roc_auc_score
+logit_roc_auc = roc_auc_score(y_test, log_re.predict(X_test)) ## 77.51
+fpr, tpr, thresholds = roc_curve(y_test, log_re.predict_proba(X_test)[:,1])
+plt.figure()
+plt.plot(fpr, tpr, label='Logistic Regression (area = %0.2f)' % logit_roc_auc)
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Review Classification')
+plt.legend(loc="lower right")
+plt.savefig('Log_ROC')
+plt.show() 
+##........RANDOM FOREST CLAssifier Implementation...... ######
+
+## Using Model ..###
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_curve, roc_auc_score
+rf = Pipeline([('tfidf', TfidfVectorizer()),
+                ('clf', RandomForestClassifier(n_estimators=100, n_jobs=-1)),
+               ]) #we can implement this code also result will be same...##   
+
+#%%time
+model=rf.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+ #### Accuracy of the model is 88.24%...###
+ 
+ ### kappa score...##
+cohen_kappa_score(y_test,y_pred) ##.70
+print(classification_report(y_test,y_pred)) ## precision 0-> .96, 1-> .87... recall 0--> .64, 1-->> .99
+# confusion Matrix...##
+from sklearn.metrics import confusion_matrix
+confusion_matrix = confusion_matrix(y_test, y_pred)
+print(confusion_matrix)
+
+## ROC Curve...
+rf_roc_auc = roc_auc_score(y_test, rf.predict(X_test)) #print(rf_roc_auc ) ## .8122
+fpr, tpr, thresholds = roc_curve(y_test, rf.predict_proba(X_test)[:,1])
+plt.figure()
+plt.plot(fpr, tpr, label='Random Forest(area = %0.2f)' % rf_roc_auc)
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Review Classification')
+plt.legend(loc="lower right")
+plt.savefig('Log_ROC')
+plt.show() 
